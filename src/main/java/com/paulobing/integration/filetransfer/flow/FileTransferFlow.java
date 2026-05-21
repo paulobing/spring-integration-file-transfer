@@ -3,11 +3,12 @@ package com.paulobing.integration.filetransfer.flow;
 import java.io.File;
 import java.time.Duration;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.file.FileReadingMessageSource;
-import org.springframework.integration.file.FileWritingMessageHandler;
+import org.springframework.integration.file.dsl.Files;
 import org.springframework.integration.file.filters.AcceptOnceFileListFilter;
 import org.springframework.integration.scheduling.PollerMetadata;
 import org.springframework.messaging.MessageChannel;
@@ -36,13 +37,12 @@ public class FileTransferFlow {
         return source;
     }
 
+    @Qualifier("fileOutboundGatewayHandler")
     @Bean
-    public MessageHandler fileWritingMessageHandler(FileTransferProperties props) {
-        FileWritingMessageHandler handler = new FileWritingMessageHandler(
-                new File(props.getTargetDir()));
-        handler.setAutoCreateDirectory(true);
-        handler.setExpectReply(false);
-        return handler;
+    public MessageHandler fileOutboundGatewayHandler(FileTransferProperties props) {
+        return Files
+                .outboundGateway(new File(props.getTargetDir()))
+                .getObject();
     }
 
     @Bean
@@ -54,7 +54,7 @@ public class FileTransferFlow {
 
     @Bean
     public IntegrationFlow fileMoveFlow(FileReadingMessageSource fileReadingMessageSource,
-            MessageHandler fileWritingMessageHandler,
+            @Qualifier("fileOutboundGatewayHandler") MessageHandler fileOutboundGatewayHandler,
             PollerMetadata poller) {
         return IntegrationFlow
                 .from(fileReadingMessageSource, config -> config.poller(poller))
@@ -63,7 +63,7 @@ public class FileTransferFlow {
                     log.info("Processing file {}", file.getName());
                     return file;
                 })
-                .handle(fileWritingMessageHandler)
-                .get();
+                .handle(fileOutboundGatewayHandler)
+                .nullChannel();
     }
 }
