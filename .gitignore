@@ -35,3 +35,4 @@ build/
 ### APP ###
 /input
 /output
+/files

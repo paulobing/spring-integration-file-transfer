@@ -17,7 +17,10 @@ import org.springframework.integration.dsl.IntegrationFlow;
 
 import com.paulobing.integration.filetransfer.config.FileTransferProperties;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Configuration
+@Slf4j
 public class FileTransferFlow {
 
     @Bean
@@ -36,8 +39,7 @@ public class FileTransferFlow {
     @Bean
     public MessageHandler fileWritingMessageHandler(FileTransferProperties props) {
         FileWritingMessageHandler handler = new FileWritingMessageHandler(
-            new File(props.getTargetDir())
-        );
+                new File(props.getTargetDir()));
         handler.setAutoCreateDirectory(true);
         handler.setExpectReply(false);
         return handler;
@@ -52,12 +54,16 @@ public class FileTransferFlow {
 
     @Bean
     public IntegrationFlow fileMoveFlow(FileReadingMessageSource fileReadingMessageSource,
-                                        MessageHandler fileWritingMessageHandler,
-                                        PollerMetadata poller) {
+            MessageHandler fileWritingMessageHandler,
+            PollerMetadata poller) {
         return IntegrationFlow
-            .from(fileReadingMessageSource, config -> config.poller(poller))
-            .channel(fileTransferChannel())
-            .handle(fileWritingMessageHandler)
-            .get();
+                .from(fileReadingMessageSource, config -> config.poller(poller))
+                .channel(fileTransferChannel())
+                .handle(File.class, (file, headers) -> {
+                    log.info("Processing file {}", file.getName());
+                    return file;
+                })
+                .handle(fileWritingMessageHandler)
+                .get();
     }
 }
