@@ -1,20 +1,24 @@
 # Spring Integration File Transfer
 
-Standalone Spring Boot application demonstrating file transfer capabilities using Spring Integration and Java DSL configuration.
+Standalone Spring Boot application demonstrating file transfer capabilities using Spring Integration with both Java DSL and XML-based configuration approaches.
 
-## Overview
+---
+
+# Overview
 
 This project implements a file-transfer integration pipeline using Spring Integration as the core messaging and orchestration framework.
 
 The application continuously polls a configurable source directory, processes detected files through a Spring Integration channel-based pipeline, logs transfer activity, and writes the files to a configurable target directory.
 
-The implementation follows a clean and minimal architecture while remaining aligned with Spring Integration concepts such as:
+Key Spring Integration concepts used:
 
 - inbound channel adapters
 - outbound gateways
 - message channels
 - pollers
 - integration flows
+- service activators
+- error handling/advice chains
 
 ---
 
@@ -32,18 +36,18 @@ The implementation follows a clean and minimal architecture while remaining alig
 
 ## Standalone Spring Boot Application
 
-The application is implemented as a standalone Spring Boot application with Java 21 and Maven dependency management.
+Implemented as a standalone Spring Boot application using Java 21 and Maven.
 
 ---
 
 ## Spring Integration Backbone
 
-Spring Integration is used as the primary integration framework and messaging backbone.
+Spring Integration is used as the primary integration and messaging framework.
 
 The application is built around:
 
-- `IntegrationFlow`
-- message channels
+- IntegrationFlow
+- Spring Integration channels
 - pollers
 - file adapters/gateways
 
@@ -51,78 +55,169 @@ The application is built around:
 
 ## file:inbound-channel-adapter
 
-A `FileReadingMessageSource` is used to poll and read files from a configurable source directory.
+Implemented using:
 
-The polling behavior is configured through a `PollerMetadata` bean using a configurable polling interval.
+- `FileReadingMessageSource` in Java DSL
+- `int-file:inbound-channel-adapter` in XML configuration
+
+Files are continuously polled from a configurable source directory.
 
 ---
 
 ## file:outbound-gateway
 
-A file outbound gateway is configured using Spring Integration's Java DSL support through:
+Implemented using:
 
-```java
-Files.outboundGateway(...)
-```
+- `Files.outboundGateway(...)` in Java DSL
+- `int-file:outbound-gateway` in XML configuration
 
-The gateway writes processed files to the configured target directory.
+Files are written to a configurable target directory.
 
 ---
 
 ## Spring Integration Channels
 
-A dedicated `DirectChannel` is used to connect the inbound adapter and outbound gateway into a message-driven integration pipeline.
+Dedicated channels connect the inbound adapter and outbound gateway into a message-driven processing pipeline.
 
 Pipeline flow:
 
 ```text
 Source Directory
     ->
-Inbound Channel Adapter
+Inbound Adapter
     ->
-DirectChannel
+Message Channel
     ->
-Logging Handler
+Pre-processing / Logging
     ->
-File Outbound Gateway
+Outbound Gateway
     ->
 Target Directory
 ```
 
 ---
 
-## Java DSL Configuration
+# Additional Challenge - XML-Based Configuration
 
-All integration configuration is implemented using Spring Integration Java DSL and Java-based configuration.
+An equivalent XML-based Spring Integration implementation was added alongside the Java DSL implementation.
 
-No XML configuration is used for the core implementation.
+Both implementations are behaviorally equivalent and can be activated independently using Spring Profiles.
+
+---
+
+## Supported Profiles
+
+### Java DSL (default)
+
+Profile:
+
+```properties
+spring.profiles.active=java-dsl
+```
+
+or:
+
+```bash
+mvn spring-boot:run
+```
+
+Uses:
+
+- `IntegrationFlow`
+- Java-based Spring configuration
+- DSL-based adapters, channels, and handlers
+
+Main configuration:
+
+```text
+FileTransferFlow.java
+```
+
+---
+
+### XML Configuration
+
+Run with:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=xml
+```
+
+Uses:
+
+- Spring Integration XML namespaces
+- XML-defined channels, adapters, pollers, and gateways
+
+Main configuration:
+
+```text
+integration-file-transfer.xml
+```
+
+Imported through:
+
+```java
+@ImportResource("classpath:integration-file-transfer.xml")
+```
+
+---
+
+# XML → Java DSL Migration Strategy
+
+The XML implementation was intentionally designed to map closely to the Java DSL implementation.
+
+## Key Mapping Decisions
+
+| XML Component                        | Java DSL Equivalent                          |
+| ------------------------------------ | -------------------------------------------- |
+| `<int-file:inbound-channel-adapter>` | `IntegrationFlow.from(...)`                  |
+| `<int:channel>`                      | `MessageChannel` bean                        |
+| `<int:service-activator>`            | `.handle(...)`                               |
+| `<int-file:outbound-gateway>`        | `Files.outboundGateway(...)`                 |
+| `<int:poller>`                       | `PollerMetadata` / `Pollers.fixedDelay(...)` |
+| XML bean references                  | Java bean injection                          |
+
+---
+
+## Migration Steps
+
+1. Convert XML channels into `MessageChannel` beans
+2. Replace XML adapters and gateways with Java DSL equivalents
+3. Convert service activators into `.handle(...)` DSL steps
+4. Move poller configuration into Java configuration beans
+5. Replace XML placeholders with `@ConfigurationProperties`
+6. Validate flow behavior and message routing after migration
+
+---
+
+## Behavioral Considerations
+
+- XML configuration is more declarative and schema-driven
+- Java DSL provides stronger IDE support and type safety
+- Gateway reply semantics must be handled carefully in both implementations
+- Bean naming consistency is important during migration
+
+Both implementations were kept behaviorally equivalent to avoid functional differences during migration.
 
 ---
 
 # Configuration
 
-Application properties are externalized using `@ConfigurationProperties`.
-
-Example:
+Example configuration:
 
 ```properties
+spring.profiles.active=java-dsl
+
 file.transfer.source-dir=./input
 file.transfer.target-dir=./output
 file.transfer.poll-interval-millis=5000
 ```
 
-Validation is applied using Jakarta Bean Validation annotations.
+The application automatically creates configured directories if they do not already exist.
 
 ---
 
 # Running the Application
-
-## Prerequisites
-
-- Java 21+
-- Maven 3.9+
-
----
 
 ## Build
 
@@ -132,10 +227,18 @@ mvn clean install
 
 ---
 
-## Run
+## Run Default Java DSL Profile
 
 ```bash
 mvn spring-boot:run
+```
+
+---
+
+## Run XML Profile
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=xml
 ```
 
 ---
@@ -151,9 +254,7 @@ input/
 output/
 ```
 
-Start the application and place a file inside the `input` directory.
-
-Example:
+Place a file into the input directory:
 
 ```text
 input/hello.txt
@@ -164,48 +265,46 @@ The application will:
 1. poll the source directory
 2. detect the file
 3. log the transfer event
-4. write the file to the `output` directory
-
----
-
-# Logging
-
-The application logs file processing events using SLF4J and Lombok logging support.
-
-Example log entry:
-
-```text
-Processing file hello.txt
-```
+4. write the file to the output directory
 
 ---
 
 # Project Structure
 
 ```text
-src/main/java
-└── com.paulobing.integration.filetransfer
-    ├── config
-    │   └── FileTransferProperties.java
-    ├── flow
-    │   └── FileTransferFlow.java
-    └── SpringIntegrationFileTransferApplication.java
+src/main
+├── java
+│   └── com.paulobing.integration.filetransfer
+│       ├── config
+│       │   └── XmlIntegrationConfig.java
+│       ├── flow
+│       │   └── FileTransferFlow.java
+│       ├── service
+│       │   └── FileTransferService.java
+│       └── SpringIntegrationFileTransferApplication.java
+└── resources
+    ├── application.properties
+    └── integration-file-transfer.xml
 ```
 
 ---
 
 # Limitations
 
-- Folders within the source directory are not processed
-- Tested up to 1.5GB file successfully
+- folders inside the source directory are ignored
+- files are processed sequentially
+- tested successfully with files up to 1.5 GB
 
 ---
 
-# Future implementations / Nice to have
+# Future Improvements
 
-- async execution of file transfer instead of one by one
-- output log to a file in one of the directories besides only stdout
-- add file transfer status (file, size, success/fail, date/time) to a table and expose an endpoint with this data
+- asynchronous file processing
+- configurable retry strategies
+- persistent metadata store for duplicate prevention
+- structured audit logging
+- REST endpoint exposing transfer history/status
+- metrics and monitoring integration
 
 ---
 
