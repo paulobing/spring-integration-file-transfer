@@ -7,5 +7,4 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 @Profile("xml")
 @ImportResource("classpath:integration-file-transfer.xml")
-public class XmlIntegrationConfig {
-}
+public class XmlIntegrationConfig {}
