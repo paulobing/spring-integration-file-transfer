@@ -41,6 +41,7 @@ The application is implemented as a standalone Spring Boot application with Java
 Spring Integration is used as the primary integration framework and messaging backbone.
 
 The application is built around:
+
 - `IntegrationFlow`
 - message channels
 - pollers
@@ -159,6 +160,7 @@ input/hello.txt
 ```
 
 The application will:
+
 1. poll the source directory
 2. detect the file
 3. log the transfer event
@@ -192,11 +194,19 @@ src/main/java
 
 ---
 
+# Future implementations / Nice to have
+
+- output log to a file in one of the directories besides only stdout
+- add file transfer status (file, size, success/fail, date/time) to a table and expose an endpoint with this data
+
+---
+
 # Notes on AI Assistance
 
 AI-assisted development tools were used during implementation, including GitHub Copilot and ChatGPT.
 
 These tools were primarily used to:
+
 - accelerate boilerplate generation
 - explore Spring Integration DSL alternatives
 - validate framework compatibility

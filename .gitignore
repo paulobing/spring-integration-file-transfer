@@ -36,3 +36,5 @@ build/
 /input
 /output
 /files
+src/test/resources/input/*
+TODO.md

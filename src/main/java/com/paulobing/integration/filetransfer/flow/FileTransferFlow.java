@@ -55,12 +55,17 @@ public class FileTransferFlow {
     @Bean
     public IntegrationFlow fileMoveFlow(FileReadingMessageSource fileReadingMessageSource,
             @Qualifier("fileOutboundGatewayHandler") MessageHandler fileOutboundGatewayHandler,
+            FileTransferProperties props,
             PollerMetadata poller) {
         return IntegrationFlow
                 .from(fileReadingMessageSource, config -> config.poller(poller))
                 .channel(fileTransferChannel())
                 .handle(File.class, (file, headers) -> {
-                    log.info("Processing file {}", file.getName());
+                    log.info("Transfer Files - copying file {} (size: {} bytes) from {} to {}",
+                            file.getName(),
+                            file.length(),
+                            props.getSourceDir(),
+                            props.getTargetDir());
                     return file;
                 })
                 .handle(fileOutboundGatewayHandler)
