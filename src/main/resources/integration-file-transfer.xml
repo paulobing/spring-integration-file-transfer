@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:int="http://www.springframework.org/schema/integration"
+    xmlns:int-file="http://www.springframework.org/schema/integration/file"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+                        http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd
+                        http://www.springframework.org/schema/integration https://www.springframework.org/schema/integration/spring-integration.xsd
+                        http://www.springframework.org/schema/integration/file https://www.springframework.org/schema/integration/file/spring-integration-file.xsd">
+
+    <!-- loads application.properties -->
+    <context:property-placeholder />
+
+    <!-- channels -->
+    <int:channel id="fileTransferChannel" />
+    <int:channel id="fileMoveChannel" />
+    <int:channel id="fileSuccessChannel" />
+    <int:channel id="fileTransferErrorChannel" />
+
+    <!-- file filter -->
+    <bean id="acceptOnceFilter"
+        class="org.springframework.integration.file.filters.AcceptOnceFileListFilter" />
+
+    <!-- inbound adapter -->
+    <int-file:inbound-channel-adapter
+        id="fileIn"
+        directory="${file.transfer.source-dir}"
+        channel="fileTransferChannel"
+        auto-create-directory="true"
+        filter="acceptOnceFilter">
+
+        <int:poller fixed-delay="${file.transfer.poll-interval-millis}" />
+
+    </int-file:inbound-channel-adapter>
+
+    <!-- pre-processing -->
+    <int:service-activator
+        input-channel="fileTransferChannel"
+        output-channel="fileMoveChannel"
+        ref="fileTransferService"
+        method="preHandle" />
+
+    <!-- outbound gateway -->
+    <int:chain
+        input-channel="fileMoveChannel"
+        output-channel="fileSuccessChannel">
+
+        <int-file:outbound-gateway
+            id="fileOut"
+            directory="${file.transfer.target-dir}"
+            auto-create-directory="true"
+            delete-source-files="false">
+
+            <int-file:request-handler-advice-chain>
+                <ref bean="fileTransferFailureAdvice" />
+            </int-file:request-handler-advice-chain>
+
+        </int-file:outbound-gateway>
+
+    </int:chain>
+
+    <!-- post-processing -->
+    <int:service-activator
+        input-channel="fileSuccessChannel"
+        ref="fileTransferService"
+        method="postHandle" />
+
+    <!-- error advice -->
+    <bean id="fileTransferFailureAdvice"
+        class="org.springframework.integration.handler.advice.ExpressionEvaluatingRequestHandlerAdvice">
+
+        <property name="trapException" value="true" />
+        <property name="failureChannel" ref="fileTransferErrorChannel" />
+
+    </bean>
+
+    <!-- error handler -->
+    <int:service-activator
+        input-channel="fileTransferErrorChannel"
+        ref="fileTransferService"
+        method="handleError" />
+
+</beans>

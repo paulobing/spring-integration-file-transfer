@@ -7,6 +7,7 @@ import org.aopalliance.aop.Advice;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.handler.advice.ExpressionEvaluatingRequestHandlerAdvice;
@@ -23,9 +24,11 @@ import com.paulobing.integration.filetransfer.config.FileTransferProperties;
 
 import lombok.extern.slf4j.Slf4j;
 
+@Profile("java-dsl")
 @Configuration
 @Slf4j
 public class FileTransferFlow {
+    private static final String LOG_PREFIX = "Java DSL";
 
     @Bean
     public MessageChannel fileTransferChannel() {
@@ -84,14 +87,14 @@ public class FileTransferFlow {
                             errorText = throwable.getClass().getSimpleName();
                         }
                         if (fileName != null) {
-                            log.error("Transfer Files - failed processing file transfer of file {}: {}",
+                            log.error(LOG_PREFIX + " Transfer Files - failed processing file transfer of file {}: {}",
                                     fileName,
                                     errorText);
                         } else {
-                            log.error("Transfer Files - failed processing file transfer: {}", errorText);
+                            log.error(LOG_PREFIX + " Transfer Files - failed processing file transfer: {}", errorText);
                         }
                     } else {
-                        log.error("Transfer Files - failed processing file transfer: {}", payload);
+                        log.error(LOG_PREFIX + " Transfer Files - failed processing file transfer: {}", payload);
                     }
                 })
                 .get();
@@ -117,7 +120,7 @@ public class FileTransferFlow {
                     if (file.isDirectory()) {
                         throw new IllegalArgumentException("folders are not supported - folder: " + file.getName());
                     }
-                    log.info("Transfer Files - copying file {} (size: {} bytes) from {} to {}",
+                    log.info(LOG_PREFIX + " Transfer Files - copying file {} (size: {} bytes) from {} to {}",
                             file.getName(),
                             file.length(),
                             props.getSourceDir(),
@@ -126,7 +129,7 @@ public class FileTransferFlow {
                 })
                 .handle(fileOutboundGatewayHandler, e -> e.advice(fileTransferFailureLoggingAdvice))
                 .handle(File.class, (file, headers) -> {
-                    log.info("Transfer Files - finished processing file transfer of file {}", file.getName());
+                    log.info(LOG_PREFIX + " Transfer Files - finished processing file transfer of file {}", file.getName());
                     return null;
                 })
                 .nullChannel();

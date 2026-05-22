@@ -1,20 +1,24 @@
 # Spring Integration File Transfer
 
-Standalone Spring Boot application demonstrating file transfer capabilities using Spring Integration and Java DSL configuration.
+Standalone Spring Boot application demonstrating file transfer capabilities using Spring Integration using both Java DSL and XML-based configuration approaches.
 
-## Overview
+---
+
+# Overview
 
 This project implements a file-transfer integration pipeline using Spring Integration as the core messaging and orchestration framework.
 
 The application continuously polls a configurable source directory, processes detected files through a Spring Integration channel-based pipeline, logs transfer activity, and writes the files to a configurable target directory.
 
-The implementation follows a clean and minimal architecture while remaining aligned with Spring Integration concepts such as:
+Key Spring Integration concepts used:
 
 - inbound channel adapters
 - outbound gateways
 - message channels
 - pollers
 - integration flows
+- service activators
+- error handling/advice chains
 
 ---
 
@@ -28,101 +32,20 @@ The implementation follows a clean and minimal architecture while remaining alig
 
 ---
 
-# Core Requirements Coverage
+# Features
 
-## Standalone Spring Boot Application
-
-The application is implemented as a standalone Spring Boot application with Java 21 and Maven dependency management.
-
----
-
-## Spring Integration Backbone
-
-Spring Integration is used as the primary integration framework and messaging backbone.
-
-The application is built around:
-
-- `IntegrationFlow`
-- message channels
-- pollers
-- file adapters/gateways
-
----
-
-## file:inbound-channel-adapter
-
-A `FileReadingMessageSource` is used to poll and read files from a configurable source directory.
-
-The polling behavior is configured through a `PollerMetadata` bean using a configurable polling interval.
-
----
-
-## file:outbound-gateway
-
-A file outbound gateway is configured using Spring Integration's Java DSL support through:
-
-```java
-Files.outboundGateway(...)
-```
-
-The gateway writes processed files to the configured target directory.
-
----
-
-## Spring Integration Channels
-
-A dedicated `DirectChannel` is used to connect the inbound adapter and outbound gateway into a message-driven integration pipeline.
-
-Pipeline flow:
-
-```text
-Source Directory
-    ->
-Inbound Channel Adapter
-    ->
-DirectChannel
-    ->
-Logging Handler
-    ->
-File Outbound Gateway
-    ->
-Target Directory
-```
-
----
-
-## Java DSL Configuration
-
-All integration configuration is implemented using Spring Integration Java DSL and Java-based configuration.
-
-No XML configuration is used for the core implementation.
-
----
-
-# Configuration
-
-Application properties are externalized using `@ConfigurationProperties`.
-
-Example:
-
-```properties
-file.transfer.source-dir=./input
-file.transfer.target-dir=./output
-file.transfer.poll-interval-millis=5000
-```
-
-Validation is applied using Jakarta Bean Validation annotations.
+- Java DSL implementation
+- XML-based Spring Integration implementation
+- Profile-based configuration switching
+- Structured logging
+- Error handling flow
+- Large-file support testing
+- Spring Integration channels and pollers
+- Automated file transfer pipeline
 
 ---
 
 # Running the Application
-
-## Prerequisites
-
-- Java 21+
-- Maven 3.9+
-
----
 
 ## Build
 
@@ -132,7 +55,15 @@ mvn clean install
 
 ---
 
-## Run
+## Default Profile (Java DSL)
+
+The Java DSL implementation is configured as the default profile:
+
+```properties
+spring.profiles.active=java-dsl
+```
+
+Run:
 
 ```bash
 mvn spring-boot:run
@@ -140,20 +71,35 @@ mvn spring-boot:run
 
 ---
 
-# Testing the File Transfer
+## XML Profile
 
-The application automatically creates the configured input and output directories if they do not already exist.
+Run:
 
-By default:
-
-```text
-input/
-output/
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=xml
 ```
 
-Start the application and place a file inside the `input` directory.
+---
 
-Example:
+# Configuration
+
+Example configuration:
+
+```properties
+spring.profiles.active=java-dsl
+
+file.transfer.source-dir=./input
+file.transfer.target-dir=./output
+file.transfer.poll-interval-millis=2000
+```
+
+Configured directories are automatically created if they do not already exist.
+
+---
+
+# Testing the File Transfer
+
+Place a file into the configured input directory:
 
 ```text
 input/hello.txt
@@ -164,48 +110,32 @@ The application will:
 1. poll the source directory
 2. detect the file
 3. log the transfer event
-4. write the file to the `output` directory
-
----
-
-# Logging
-
-The application logs file processing events using SLF4J and Lombok logging support.
-
-Example log entry:
-
-```text
-Processing file hello.txt
-```
+4. copy the file to the output directory
 
 ---
 
 # Project Structure
 
 ```text
-src/main/java
-└── com.paulobing.integration.filetransfer
-    ├── config
-    │   └── FileTransferProperties.java
-    ├── flow
-    │   └── FileTransferFlow.java
-    └── SpringIntegrationFileTransferApplication.java
+src/main
+├── java
+│   └── com.paulobing.integration.filetransfer
+│       ├── config
+│       ├── flow
+│       ├── service
+│       └── SpringIntegrationFileTransferApplication.java
+└── resources
+    ├── application.properties
+    └── integration-file-transfer.xml
 ```
 
 ---
 
-# Limitations
+# Additional Documentation
 
-- Folders within the source directory are not processed
-- Tested up to 1.5GB file successfully
-
----
-
-# Future implementations / Nice to have
-
-- async execution of file transfer instead of one by one
-- output log to a file in one of the directories besides only stdout
-- add file transfer status (file, size, success/fail, date/time) to a table and expose an endpoint with this data
+- [XML Migration Guide](docs/XML_MIGRATION_GUIDE.md) — detailed explanation of the XML-based implementation, migration strategy to Java DSL, mapping decisions, and behavioral considerations
+- [Architecture Overview](docs/ARCHITECTURE.md) — architecture overview, Spring Integration flow design, channels, profiles, logging, and error handling
+- [Testing Strategy](docs/TESTING.md) — testing strategy, profile-based testing, large-file validation, and integration test considerations
 
 ---
 
