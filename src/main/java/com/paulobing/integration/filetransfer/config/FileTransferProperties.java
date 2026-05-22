@@ -13,12 +13,10 @@ import org.springframework.validation.annotation.Validated;
 @Data
 public class FileTransferProperties {
 
-    @NotBlank
-    private String sourceDir;
+  @NotBlank private String sourceDir;
 
-    @NotBlank
-    private String targetDir;
+  @NotBlank private String targetDir;
 
-    @Min(1)
-    private long pollIntervalMillis;
+  @Min(1)
+  private long pollIntervalMillis;
 }
