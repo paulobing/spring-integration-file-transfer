@@ -194,8 +194,16 @@ src/main/java
 
 ---
 
+# Limitations
+
+- Folders within the source directory are not processed
+- Tested up to 1.5GB file successfully
+
+---
+
 # Future implementations / Nice to have
 
+- async execution of file transfer instead of one by one
 - output log to a file in one of the directories besides only stdout
 - add file transfer status (file, size, success/fail, date/time) to a table and expose an endpoint with this data
 

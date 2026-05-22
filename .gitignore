@@ -32,6 +32,11 @@ build/
 ### VS Code ###
 .vscode/
 
+### MISC ###
+.DS_Store
+*.log
+*.tmp
+
 ### APP ###
 /input
 /output
