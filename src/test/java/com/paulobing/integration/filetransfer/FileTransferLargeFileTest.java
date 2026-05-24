@@ -109,7 +109,13 @@ class FileTransferLargeFileTest {
 
       String expectedRegex = buildExpectedFilenameRegex(originalFile);
 
-      try (var files = Files.list(targetDir)) {
+      Path routedTargetDir = resolveExpectedTargetDirectory(originalFile);
+
+      assertTrue(
+          Files.exists(routedTargetDir),
+          "Expected routed directory does not exist: " + routedTargetDir);
+
+      try (var files = Files.list(routedTargetDir)) {
 
         List<Path> matchingFiles =
             files
@@ -187,6 +193,34 @@ class FileTransferLargeFileTest {
                   }
                 });
       }
+    }
+
+    private Path resolveExpectedTargetDirectory(Path originalFile) throws IOException {
+
+      long size = Files.size(originalFile);
+
+      if (size > props.getLargeFileThresholdBytes()) {
+        return targetDir.resolve(props.getLargeFileDir());
+      }
+
+      String extension = getExtension(originalFile.getFileName().toString());
+
+      return props.getCategory().values().stream()
+          .filter(category -> category.getExtensions().contains(extension))
+          .map(category -> targetDir.resolve(category.getDir()))
+          .findFirst()
+          .orElse(targetDir.resolve("default"));
+    }
+
+    private String getExtension(String filename) {
+
+      int index = filename.lastIndexOf('.');
+
+      if (index == -1) {
+        return "";
+      }
+
+      return filename.substring(index + 1).toLowerCase();
     }
   }
 
