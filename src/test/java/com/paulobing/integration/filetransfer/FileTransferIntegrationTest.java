@@ -22,7 +22,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 
-class FileTransferLargeFileTest {
+class FileTransferIntegrationTest {
 
   abstract static class BaseTest {
 
@@ -246,27 +246,37 @@ class FileTransferLargeFileTest {
   @SpringBootTest
   @DirtiesContext
   @ActiveProfiles("java-dsl")
-  @TestPropertySource(properties = {"file.transfer.naming-strategy=timestamp"})
+  @TestPropertySource(
+      properties = {
+        "file.transfer.naming-strategy=timestamp",
+        "file.transfer.file-ready-age-seconds=0"
+      })
   class JavaDslTimestampTest extends BaseTest {}
 
   @Nested
   @SpringBootTest
   @DirtiesContext
   @ActiveProfiles("java-dsl")
-  @TestPropertySource(properties = "file.transfer.naming-strategy=uuid")
+  @TestPropertySource(
+      properties = {"file.transfer.naming-strategy=uuid", "file.transfer.file-ready-age-seconds=0"})
   class JavaDslUuidTest extends BaseTest {}
 
   @Nested
   @SpringBootTest
   @DirtiesContext
   @ActiveProfiles("xml")
-  @TestPropertySource(properties = "file.transfer.naming-strategy=timestamp")
+  @TestPropertySource(
+      properties = {
+        "file.transfer.naming-strategy=timestamp",
+        "file.transfer.file-ready-age-seconds=0"
+      })
   class XmlTimestampTest extends BaseTest {}
 
   @Nested
   @SpringBootTest
   @DirtiesContext
   @ActiveProfiles("xml")
-  @TestPropertySource(properties = "file.transfer.naming-strategy=uuid")
+  @TestPropertySource(
+      properties = {"file.transfer.naming-strategy=uuid", "file.transfer.file-ready-age-seconds=0"})
   class XmlUuidTest extends BaseTest {}
 }

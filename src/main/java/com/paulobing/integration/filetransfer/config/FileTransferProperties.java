@@ -26,6 +26,9 @@ public class FileTransferProperties {
   @Min(1)
   private long pollIntervalMillis;
 
+  @Min(0)
+  private long fileReadyAgeSeconds = 10;
+
   @Min(1)
   private long largeFileThresholdBytes;
 

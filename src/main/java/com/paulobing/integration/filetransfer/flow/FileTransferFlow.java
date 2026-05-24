@@ -19,6 +19,8 @@ import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.file.FileReadingMessageSource;
 import org.springframework.integration.file.dsl.Files;
 import org.springframework.integration.file.filters.AcceptOnceFileListFilter;
+import org.springframework.integration.file.filters.ChainFileListFilter;
+import org.springframework.integration.file.filters.LastModifiedFileListFilter;
 import org.springframework.integration.handler.advice.ExpressionEvaluatingRequestHandlerAdvice;
 import org.springframework.integration.scheduling.PollerMetadata;
 import org.springframework.messaging.Message;
@@ -44,9 +46,26 @@ public class FileTransferFlow {
 
   @Bean
   public FileReadingMessageSource fileReadingMessageSource(FileTransferProperties props) {
+
     FileReadingMessageSource source = new FileReadingMessageSource();
     source.setDirectory(new File(props.getSourceDir()));
-    source.setFilter(new AcceptOnceFileListFilter<>());
+    ChainFileListFilter<File> filter = new ChainFileListFilter<>();
+
+    /*
+     * IMPORTANT:
+     *
+     * LastModifiedFileListFilter MUST run BEFORE
+     * AcceptOnceFileListFilter.
+     *
+     * Otherwise files that are still being written
+     * are permanently marked as "already seen"
+     * and never processed again.
+     */
+    filter.addFilter(new LastModifiedFileListFilter(props.getFileReadyAgeSeconds()));
+    filter.addFilter(new AcceptOnceFileListFilter<>());
+
+    source.setFilter(filter);
+
     return source;
   }
 
@@ -121,6 +140,7 @@ public class FileTransferFlow {
     return poller;
   }
 
+  @SuppressWarnings("null")
   @Bean
   public IntegrationFlow fileMoveFlow(
       FileReadingMessageSource fileReadingMessageSource,
