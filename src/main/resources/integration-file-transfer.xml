@@ -9,20 +9,25 @@
                         http://www.springframework.org/schema/integration https://www.springframework.org/schema/integration/spring-integration.xsd
                         http://www.springframework.org/schema/integration/file https://www.springframework.org/schema/integration/file/spring-integration-file.xsd">
 
-    <!-- loads application.properties -->
     <context:property-placeholder />
 
-    <!-- channels -->
+    <!-- CHANNELS -->
+
     <int:channel id="fileTransferChannel" />
+    <int:channel id="fileMetadataChannel" />
+    <int:channel id="fileTransformationChannel" />
     <int:channel id="fileMoveChannel" />
     <int:channel id="fileSuccessChannel" />
     <int:channel id="fileTransferErrorChannel" />
+    <int:channel id="fileRoutingChannel" />
 
-    <!-- file filter -->
+    <!-- FILE FILTER -->
+
     <bean id="acceptOnceFilter"
         class="org.springframework.integration.file.filters.AcceptOnceFileListFilter" />
 
-    <!-- inbound adapter -->
+    <!-- INBOUND ADAPTER -->
+
     <int-file:inbound-channel-adapter
         id="fileIn"
         directory="${file.transfer.source-dir}"
@@ -34,39 +39,45 @@
 
     </int-file:inbound-channel-adapter>
 
-    <!-- pre-processing -->
+    <!-- METADATA ENRICHMENT -->
+
     <int:service-activator
         input-channel="fileTransferChannel"
-        output-channel="fileMoveChannel"
-        ref="fileTransferService"
-        method="preHandle" />
+        output-channel="fileTransformationChannel"
+        ref="fileMetadataEnricher"
+        method="enrich" />
 
-    <!-- outbound gateway -->
-    <int:chain
-        input-channel="fileMoveChannel"
-        output-channel="fileSuccessChannel">
+    <!-- FILENAME TRANSFORMATION -->
 
-        <int-file:outbound-gateway
-            id="fileOut"
-            directory="${file.transfer.target-dir}"
-            auto-create-directory="true"
-            delete-source-files="false">
-
-            <int-file:request-handler-advice-chain>
-                <ref bean="fileTransferFailureAdvice" />
-            </int-file:request-handler-advice-chain>
-
-        </int-file:outbound-gateway>
-
-    </int:chain>
-
-    <!-- post-processing -->
     <int:service-activator
-        input-channel="fileSuccessChannel"
-        ref="fileTransferService"
-        method="postHandle" />
+        input-channel="fileTransformationChannel"
+        output-channel="fileMoveChannel"
+        ref="fileNameTransformer"
+        method="transform" />
 
-    <!-- error advice -->
+    <!-- ROUTING ENRICHMENT -->
+
+    <int:service-activator
+        input-channel="fileMoveChannel"
+        output-channel="fileRoutingChannel"
+        ref="routingHeaderEnricher"
+        method="enrich" />
+
+    <!-- AUDIT START -->
+
+    <int:service-activator
+        input-channel="fileRoutingChannel"
+        output-channel="fileOutboundChannel"
+        ref="auditLoggingService"
+        method="logTransferStarted" />
+
+
+    <!-- OUTBOUND CHANNEL -->
+
+    <int:channel id="fileOutboundChannel" />
+
+    <!-- ERROR ADVICE -->
+
     <bean id="fileTransferFailureAdvice"
         class="org.springframework.integration.handler.advice.ExpressionEvaluatingRequestHandlerAdvice">
 
@@ -75,7 +86,38 @@
 
     </bean>
 
-    <!-- error handler -->
+    <!-- OUTBOUND GATEWAY -->
+
+    <int:chain
+        input-channel="fileOutboundChannel"
+        output-channel="fileSuccessChannel">
+
+        <int-file:outbound-gateway
+            id="fileOut"
+            directory-expression="headers.outputDirectory"
+            auto-create-directory="true"
+            delete-source-files="false"
+            filename-generator-expression="headers.generatedFilename">
+
+            <int-file:request-handler-advice-chain>
+
+                <ref bean="fileTransferFailureAdvice" />
+
+            </int-file:request-handler-advice-chain>
+
+        </int-file:outbound-gateway>
+
+    </int:chain>
+
+    <!-- AUDIT SUCCESS -->
+
+    <int:service-activator
+        input-channel="fileSuccessChannel"
+        ref="auditLoggingService"
+        method="logTransferCompleted" />
+
+    <!-- ERROR FLOW -->
+
     <int:service-activator
         input-channel="fileTransferErrorChannel"
         ref="fileTransferService"
