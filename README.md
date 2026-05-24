@@ -8,7 +8,7 @@ Standalone Spring Boot application demonstrating file-transfer capabilities usin
 
 This project implements a polling-based asynchronous file-transfer pipeline using Spring Integration as the core messaging and orchestration framework.
 
-The application continuously polls a configurable source directory, processes detected files through a Spring Integration channel-based pipeline, enriches messages with metadata, logs structured audit events, and writes the files to a configurable target directory.
+The application continuously polls a configurable source directory, processes detected files through a Spring Integration channel-based pipeline, enriches messages with metadata, logs structured audit events, dynamically routes files to different target directories, and writes the files to configurable output locations.
 
 The project intentionally provides equivalent implementations using:
 
@@ -26,6 +26,8 @@ Key Spring Integration concepts used:
 - integration flows
 - service activators
 - metadata enrichment
+- header enrichment
+- dynamic routing
 - advice chains
 - error channels
 
@@ -51,10 +53,15 @@ Key Spring Integration concepts used:
 - Configurable filename generation strategies
   - timestamp-based
   - UUID-based
+- Dynamic routing based on:
+  - file extension
+  - file size
+- Configurable category-based target directories
+- Support for large-file transfers (tested up to 1.5GB)
+- Protection against consuming incomplete files still being written
 - Error handling flow with advice chains
-- Large-file integration testing
 - Isolated temporary directories for integration tests
-- Spring Integration channels, pollers, and service activators
+- Spring Integration channels, pollers, routers, and service activators
 - Automated asynchronous file transfer pipeline
 
 ---
@@ -71,6 +78,8 @@ Inbound Channel Adapter
 Metadata Enrichment
     ↓
 Filename Transformation
+    ↓
+Routing Header Enrichment
     ↓
 Audit Logging
     ↓
@@ -134,7 +143,24 @@ file.transfer.source-dir=./input
 file.transfer.target-dir=./output
 file.transfer.poll-interval-millis=2000
 
+# filename strategy
 file.transfer.naming-strategy=timestamp
+
+# incomplete-file protection
+file.transfer.file-ready-age-seconds=10
+
+# large-file routing
+file.transfer.large-file-threshold-bytes=5000000
+file.transfer.large-file-dir=large-files
+
+# category-based routing
+file.transfer.categories=image,text
+
+file.transfer.category.image.extensions=jpg,jpeg,png,gif
+file.transfer.category.image.dir=images
+
+file.transfer.category.text.extensions=txt,log,csv
+file.transfer.category.text.dir=text
 ```
 
 Configured directories are automatically created if they do not already exist.
@@ -182,8 +208,73 @@ Attached metadata includes:
 - file size
 - ingestion timestamp
 - transfer correlation ID
+- routing target
 
-These headers are propagated throughout the integration flow and used for logging, auditing, and downstream processing.
+These headers are propagated throughout the integration flow and used for logging, auditing, routing, and downstream processing.
+
+---
+
+# Dynamic Routing
+
+The integration flow enriches each message with routing information before writing the file to the output directory.
+
+Routing decisions are based on:
+
+- file extension
+- file size
+
+Examples:
+
+```text
+hello.txt        → output/text
+image.png        → output/images
+huge-video.mp4   → output/large-files
+```
+
+Routing rules are fully configurable through `application.properties`.
+
+---
+
+# Large File Support
+
+The application supports transferring large files efficiently using Spring Integration's streaming-based file handling.
+
+The implementation has been validated with files larger than:
+
+```text
+1.5 GB
+```
+
+without requiring special JVM tuning or custom buffering logic.
+
+---
+
+# Incomplete File Protection
+
+The application prevents consuming files that are still being written by an external producer process.
+
+This is implemented using Spring Integration's:
+
+```text
+LastModifiedFileListFilter
+```
+
+Files are only considered eligible for processing after remaining unchanged for a configurable stabilization window.
+
+Example:
+
+```properties
+file.transfer.file-ready-age-seconds=10
+```
+
+This protects the integration flow from:
+
+- partially written files
+- truncated reads
+- race conditions with external systems
+- incomplete transfers
+
+Integration tests simulate a slow producer writing a file incrementally to validate this behavior.
 
 ---
 
@@ -196,6 +287,8 @@ Example start event:
 ```text
 JavaDSL AUDIT transferId=8d8c8f2e-6f17-4ec2-ae14-f7a7c7f91f40 \
 event=file-transfer-started \
+inputDirectory=./input \
+outputDirectory=./output/text \
 originalFilename=hello.txt \
 generatedFilename=20260524_194214_hello.txt \
 size=12345 \
@@ -207,6 +300,8 @@ Example completion event:
 ```text
 JavaDSL AUDIT transferId=8d8c8f2e-6f17-4ec2-ae14-f7a7c7f91f40 \
 event=file-transfer-completed \
+inputDirectory=./input \
+outputDirectory=./output/text \
 originalFilename=hello.txt \
 generatedFilename=20260524_194214_hello.txt
 ```
@@ -252,10 +347,12 @@ The application will:
 
 1. poll the source directory
 2. detect the file
-3. enrich transfer metadata
-4. generate a transformed filename
-5. log audit events
-6. copy the file to the output directory
+3. wait until the file is stable (if incomplete-file protection is enabled)
+4. enrich transfer metadata
+5. generate a transformed filename
+6. determine the routing target
+7. log audit events
+8. copy the file to the routed output directory
 
 ---
 
@@ -267,8 +364,10 @@ The test suite validates:
 
 - successful file transfer
 - large-file handling
+- incomplete-file protection
 - filename transformation
 - metadata propagation
+- dynamic routing behavior
 - profile parity between XML and Java DSL flows
 
 Because the integration flow is asynchronous and poller-driven, tests use eventual-consistency polling with timeout-based assertions.
@@ -298,7 +397,7 @@ src/main
 
 - [XML Migration Guide](docs/XML_MIGRATION_GUIDE.md) — detailed explanation of the XML-based implementation, migration strategy to Java DSL, mapping decisions, and behavioral considerations
 - [Architecture Overview](docs/ARCHITECTURE.md) — architecture overview, Spring Integration flow design, channels, profiles, logging, and error handling
-- [Testing Strategy](docs/TESTING.md) — testing strategy, profile-based testing, large-file validation, and integration test considerations
+- [Testing Strategy](docs/TESTING.md) — testing strategy, profile-based testing, large-file validation, incomplete-file handling, and integration test considerations
 
 ---
 
@@ -315,3 +414,10 @@ These tools were primarily used to:
 - discuss architectural and integration design decisions
 
 All generated code and configuration were manually reviewed, adjusted, validated, and tested during implementation.
+
+---
+
+# Author
+
+Paulo Bing  
+paulo.bing@gmail.com
