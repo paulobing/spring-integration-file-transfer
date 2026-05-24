@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>com.paulobing</groupId>
 	<artifactId>spring-integration-file-transfer</artifactId>
-	<version>1.0.2</version>
+	<version>1.0.3</version>
 	<name>spring-integration-file-transfer</name>
 	<description />
 	<url />
