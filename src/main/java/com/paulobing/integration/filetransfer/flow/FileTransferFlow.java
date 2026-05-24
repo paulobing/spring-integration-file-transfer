@@ -2,6 +2,7 @@ package com.paulobing.integration.filetransfer.flow;
 
 import com.paulobing.integration.filetransfer.config.FileTransferProperties;
 import com.paulobing.integration.filetransfer.enricher.FileMetadataEnricher;
+import com.paulobing.integration.filetransfer.enricher.RoutingHeaderEnricher;
 import com.paulobing.integration.filetransfer.service.AuditLoggingService;
 import com.paulobing.integration.filetransfer.shared.FileHeaders;
 import com.paulobing.integration.filetransfer.transformer.FileNameTransformer;
@@ -52,7 +53,12 @@ public class FileTransferFlow {
   @Qualifier("fileOutboundGatewayHandler")
   @Bean
   public MessageHandler fileOutboundGatewayHandler(FileTransferProperties props) {
-    return Files.outboundGateway(new File(props.getTargetDir()))
+    return Files.outboundGateway(
+            message -> {
+              String route = (String) message.getHeaders().get(FileHeaders.ROUTE_TARGET);
+
+              return new File(props.getTargetDir() + "/" + route);
+            })
         .fileNameGenerator(
             message -> (String) message.getHeaders().get(FileHeaders.GENERATED_FILENAME))
         .getObject();
@@ -118,31 +124,22 @@ public class FileTransferFlow {
   @Bean
   public IntegrationFlow fileMoveFlow(
       FileReadingMessageSource fileReadingMessageSource,
-      @Qualifier("fileOutboundGatewayHandler") MessageHandler fileOutboundGatewayHandler,
       FileMetadataEnricher fileMetadataEnricher,
-      AuditLoggingService auditLoggingService,
       FileNameTransformer fileNameTransformer,
-      PollerMetadata poller,
-      Advice fileTransferFailureLoggingAdvice) {
+      RoutingHeaderEnricher routingHeaderEnricher,
+      @Qualifier("fileOutboundGatewayHandler") MessageHandler fileOutboundGatewayHandler,
+      AuditLoggingService auditLoggingService,
+      @Qualifier("fileTransferFailureLoggingAdvice") Advice fileTransferFailureLoggingAdvice,
+      PollerMetadata poller) {
 
     return IntegrationFlow.from(fileReadingMessageSource, config -> config.poller(poller))
         .channel(fileTransferChannel())
         .handle(fileMetadataEnricher, "enrich")
         .handle(fileNameTransformer, "transform")
+        .handle(routingHeaderEnricher, "enrich")
         .handle(auditLoggingService, "logTransferStarted")
         .handle(fileOutboundGatewayHandler, e -> e.advice(fileTransferFailureLoggingAdvice))
         .handle(auditLoggingService, "logTransferCompleted")
-        .nullChannel();
-  }
-
-  @Bean
-  public Advice fileTransferLoggingAdvice(AuditLoggingService auditLoggingService) {
-    ExpressionEvaluatingRequestHandlerAdvice advice =
-        new ExpressionEvaluatingRequestHandlerAdvice();
-
-    advice.setOnSuccessExpressionString("payload");
-    advice.setSuccessChannelName("nullChannel");
-    advice.setTrapException(true);
-    return advice;
+        .get();
   }
 }
