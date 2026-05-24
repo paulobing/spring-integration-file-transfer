@@ -9,20 +9,24 @@
                         http://www.springframework.org/schema/integration https://www.springframework.org/schema/integration/spring-integration.xsd
                         http://www.springframework.org/schema/integration/file https://www.springframework.org/schema/integration/file/spring-integration-file.xsd">
 
-    <!-- loads application.properties -->
     <context:property-placeholder />
 
-    <!-- channels -->
+    <!-- CHANNELS -->
+
     <int:channel id="fileTransferChannel" />
+    <int:channel id="fileMetadataChannel" />
+    <int:channel id="fileTransformationChannel" />
     <int:channel id="fileMoveChannel" />
     <int:channel id="fileSuccessChannel" />
     <int:channel id="fileTransferErrorChannel" />
 
-    <!-- file filter -->
+    <!-- FILE FILTER -->
+
     <bean id="acceptOnceFilter"
         class="org.springframework.integration.file.filters.AcceptOnceFileListFilter" />
 
-    <!-- inbound adapter -->
+    <!-- INBOUND ADAPTER -->
+
     <int-file:inbound-channel-adapter
         id="fileIn"
         directory="${file.transfer.source-dir}"
@@ -34,23 +38,56 @@
 
     </int-file:inbound-channel-adapter>
 
-    <!-- pre-processing -->
+    <!-- METADATA ENRICHMENT -->
+
     <int:service-activator
         input-channel="fileTransferChannel"
-        output-channel="fileMoveChannel"
-        ref="fileTransferService"
-        method="preHandle" />
+        output-channel="fileTransformationChannel"
+        ref="fileMetadataEnricher"
+        method="enrich" />
 
-    <!-- outbound gateway -->
-    <int:chain
+    <!-- FILENAME TRANSFORMATION -->
+
+    <int:service-activator
+        input-channel="fileTransformationChannel"
+        output-channel="fileMoveChannel"
+        ref="fileNameTransformer"
+        method="transform" />
+
+    <!-- AUDIT START -->
+
+    <int:service-activator
         input-channel="fileMoveChannel"
+        output-channel="fileOutboundChannel"
+        ref="auditLoggingService"
+        method="logTransferStarted" />
+
+    <!-- OUTBOUND CHANNEL -->
+
+    <int:channel id="fileOutboundChannel" />
+
+    <!-- ERROR ADVICE -->
+
+    <bean id="fileTransferFailureAdvice"
+        class="org.springframework.integration.handler.advice.ExpressionEvaluatingRequestHandlerAdvice">
+
+        <property name="trapException" value="true" />
+        <property name="failureChannel" ref="fileTransferErrorChannel" />
+
+    </bean>
+
+    <!-- OUTBOUND GATEWAY -->
+
+    <int:chain
+        input-channel="fileOutboundChannel"
         output-channel="fileSuccessChannel">
 
         <int-file:outbound-gateway
             id="fileOut"
             directory="${file.transfer.target-dir}"
             auto-create-directory="true"
-            delete-source-files="false">
+            delete-source-files="false"
+            filename-generator-expression="headers.generatedFilename">
 
             <int-file:request-handler-advice-chain>
                 <ref bean="fileTransferFailureAdvice" />
@@ -60,22 +97,15 @@
 
     </int:chain>
 
-    <!-- post-processing -->
+    <!-- AUDIT SUCCESS -->
+
     <int:service-activator
         input-channel="fileSuccessChannel"
-        ref="fileTransferService"
-        method="postHandle" />
+        ref="auditLoggingService"
+        method="logTransferCompleted" />
 
-    <!-- error advice -->
-    <bean id="fileTransferFailureAdvice"
-        class="org.springframework.integration.handler.advice.ExpressionEvaluatingRequestHandlerAdvice">
+    <!-- ERROR FLOW -->
 
-        <property name="trapException" value="true" />
-        <property name="failureChannel" ref="fileTransferErrorChannel" />
-
-    </bean>
-
-    <!-- error handler -->
     <int:service-activator
         input-channel="fileTransferErrorChannel"
         ref="fileTransferService"

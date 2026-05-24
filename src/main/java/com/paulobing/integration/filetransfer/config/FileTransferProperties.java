@@ -1,5 +1,6 @@
 package com.paulobing.integration.filetransfer.config;
 
+import com.paulobing.integration.filetransfer.shared.FileNamingStrategy;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -12,6 +13,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @Data
 public class FileTransferProperties {
+
+  private FileNamingStrategy namingStrategy = FileNamingStrategy.TIMESTAMP;
 
   @NotBlank private String sourceDir;
 

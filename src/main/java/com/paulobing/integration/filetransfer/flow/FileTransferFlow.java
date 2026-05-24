@@ -1,6 +1,10 @@
 package com.paulobing.integration.filetransfer.flow;
 
 import com.paulobing.integration.filetransfer.config.FileTransferProperties;
+import com.paulobing.integration.filetransfer.enricher.FileMetadataEnricher;
+import com.paulobing.integration.filetransfer.service.AuditLoggingService;
+import com.paulobing.integration.filetransfer.shared.FileHeaders;
+import com.paulobing.integration.filetransfer.transformer.FileNameTransformer;
 import java.io.File;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +52,10 @@ public class FileTransferFlow {
   @Qualifier("fileOutboundGatewayHandler")
   @Bean
   public MessageHandler fileOutboundGatewayHandler(FileTransferProperties props) {
-    return Files.outboundGateway(new File(props.getTargetDir())).getObject();
+    return Files.outboundGateway(new File(props.getTargetDir()))
+        .fileNameGenerator(
+            message -> (String) message.getHeaders().get(FileHeaders.GENERATED_FILENAME))
+        .getObject();
   }
 
   @Bean
@@ -112,35 +119,30 @@ public class FileTransferFlow {
   public IntegrationFlow fileMoveFlow(
       FileReadingMessageSource fileReadingMessageSource,
       @Qualifier("fileOutboundGatewayHandler") MessageHandler fileOutboundGatewayHandler,
-      FileTransferProperties props,
+      FileMetadataEnricher fileMetadataEnricher,
+      AuditLoggingService auditLoggingService,
+      FileNameTransformer fileNameTransformer,
       PollerMetadata poller,
       Advice fileTransferFailureLoggingAdvice) {
+
     return IntegrationFlow.from(fileReadingMessageSource, config -> config.poller(poller))
         .channel(fileTransferChannel())
-        .handle(
-            File.class,
-            (file, headers) -> {
-              if (file.isDirectory()) {
-                throw new IllegalArgumentException(
-                    "folders are not supported - folder: " + file.getName());
-              }
-              log.info(
-                  LOG_PREFIX + " Transfer Files - copying file {} (size: {} bytes) from {} to {}",
-                  file.getName(),
-                  file.length(),
-                  props.getSourceDir(),
-                  props.getTargetDir());
-              return file;
-            })
+        .handle(fileMetadataEnricher, "enrich")
+        .handle(fileNameTransformer, "transform")
+        .handle(auditLoggingService, "logTransferStarted")
         .handle(fileOutboundGatewayHandler, e -> e.advice(fileTransferFailureLoggingAdvice))
-        .handle(
-            File.class,
-            (file, headers) -> {
-              log.info(
-                  LOG_PREFIX + " Transfer Files - finished processing file transfer of file {}",
-                  file.getName());
-              return null;
-            })
+        .handle(auditLoggingService, "logTransferCompleted")
         .nullChannel();
+  }
+
+  @Bean
+  public Advice fileTransferLoggingAdvice(AuditLoggingService auditLoggingService) {
+    ExpressionEvaluatingRequestHandlerAdvice advice =
+        new ExpressionEvaluatingRequestHandlerAdvice();
+
+    advice.setOnSuccessExpressionString("payload");
+    advice.setSuccessChannelName("nullChannel");
+    advice.setTrapException(true);
+    return advice;
   }
 }
