@@ -3,6 +3,7 @@ package com.paulobing.integration.filetransfer.service;
 import com.paulobing.integration.filetransfer.shared.FileHeaders;
 import java.io.File;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Service;
 
@@ -10,7 +11,12 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class AuditLoggingService {
 
-  private static final String LOG_PREFIX = "JavaDSL";
+  private final String logPrefix;
+
+  public AuditLoggingService(Environment environment) {
+    String[] profiles = environment.getActiveProfiles();
+    this.logPrefix = profiles.length > 0 ? profiles[0] : "default";
+  }
 
   public Message<?> logTransferStarted(Message<?> message) {
 
@@ -19,7 +25,7 @@ public class AuditLoggingService {
     log.info(
         "{} AUDIT transferId={} event={} originalFilename={} generatedFilename={} "
             + "size={} ingestionTimestamp={} inputDirectory={} outputDirectory={}",
-        LOG_PREFIX,
+        logPrefix,
         message.getHeaders().get(FileHeaders.TRANSFER_ID),
         "file-transfer-started",
         message.getHeaders().get(FileHeaders.ORIGINAL_FILENAME),
@@ -37,7 +43,7 @@ public class AuditLoggingService {
     log.info(
         "{} AUDIT transferId={} event={} originalFilename={} generatedFilename={} "
             + "inputDirectory={} outputDirectory={}",
-        LOG_PREFIX,
+        logPrefix,
         message.getHeaders().get(FileHeaders.TRANSFER_ID),
         "file-transfer-completed",
         message.getHeaders().get(FileHeaders.ORIGINAL_FILENAME),
