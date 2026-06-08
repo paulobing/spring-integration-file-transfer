@@ -26,6 +26,12 @@
     <bean id="acceptOnceFilter"
         class="org.springframework.integration.file.filters.AcceptOnceFileListFilter" />
 
+    <!--
+    <bean id="lastModifiedFileListFilter"
+        class="org.springframework.integration.file.filters.LastModifiedFileListFilter" />
+        -->
+
+
     <!-- INBOUND ADAPTER -->
 
     <int-file:inbound-channel-adapter

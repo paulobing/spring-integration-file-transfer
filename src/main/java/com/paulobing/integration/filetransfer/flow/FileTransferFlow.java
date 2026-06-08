@@ -51,16 +51,6 @@ public class FileTransferFlow {
     source.setDirectory(new File(props.getSourceDir()));
     ChainFileListFilter<File> filter = new ChainFileListFilter<>();
 
-    /*
-     * IMPORTANT:
-     *
-     * LastModifiedFileListFilter MUST run BEFORE
-     * AcceptOnceFileListFilter.
-     *
-     * Otherwise files that are still being written
-     * are permanently marked as "already seen"
-     * and never processed again.
-     */
     filter.addFilter(new LastModifiedFileListFilter(props.getFileReadyAgeSeconds()));
     filter.addFilter(new AcceptOnceFileListFilter<>());
 
