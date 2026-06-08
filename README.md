@@ -421,5 +421,3 @@ All generated code and configuration were manually reviewed, adjusted, validated
 
 Paulo Bing  
 paulo.bing@gmail.com
-
-test

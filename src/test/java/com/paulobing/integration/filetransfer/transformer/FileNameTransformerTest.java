@@ -48,7 +48,7 @@ class FileNameTransformerTest {
 
       FileNameTransformer transformer = new FileNameTransformer(props);
 
-      File file = new File("document.txt");
+      File file = new File("document2.txt");
 
       Message<File> message = MessageBuilder.withPayload(file).build();
 
